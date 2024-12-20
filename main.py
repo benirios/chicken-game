@@ -1,12 +1,19 @@
 ﻿import pygame
 import sys
 import random
- 
+import screeninfo 
+
+from screeninfo import get_monitors
+
+# Get information about all monitors
+for monitor in get_monitors():
+    print(f"Monitor: {monitor.name}, Width: {monitor.width}, Height: {monitor.height}, Position: ({monitor.x}, {monitor.y})")
+
 # Inicialização do Pygame
 pygame.init()
  
 # Configurações da tela
-WIDTH, HEIGHT = 920, 780
+WIDTH, HEIGHT = monitor.width, monitor.height
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Chicken Egg Drop")
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
