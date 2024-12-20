@@ -25,14 +25,6 @@ RED = (255, 0, 0)
 # Relógio para controlar o FPS
 clock = pygame.time.Clock()
 FPS = 75
-
-# hawk
-hawk = pygame.Rect(WIDTH, random.randint(50, HEIGHT - 50), 100, 50)
-hawk_speed = 7
-hawk_active = False
-hawk_timer = 0
-hawk_interval = 30000  # 30 seconds in milliseconds
-hawk_duration = 10000  # 10 seconds in milliseconds
  
 # Carregar imagens
 chicken = pygame.image.load("galinha.png")
@@ -43,6 +35,8 @@ background = pygame.image.load("background.png")
 background = pygame.transform.scale(background, (WIDTH, HEIGHT))
 pedra = pygame.image.load("pedra.png")
 pedra = pygame.transform.scale(pedra, (100, 100))
+hawk = pygame.image.load("hawk.png")
+hawk = pygame.transform.scale(hawk, (120, 80))
  
 # Variáveis do jogo
 chicken_x = WIDTH // 2 - 25
@@ -57,6 +51,14 @@ egg_speed = 5
 pedras = []
 pedra_speed = 2
 pedra_spawn_rate = 1000  # Tempo inicial entre o aparecimento das pedras (em milissegundos)
+ 
+hawk_active = False
+hawk_x = WIDTH
+hawk_y = random.randint(50, HEIGHT - 150)
+hawk_speed = 7
+hawk_timer = pygame.time.get_ticks()
+hawk_interval = 30000  # 30 segundos em milissegundos
+hawk_duration = 10000  # 10 segundos em milissegundos
  
 game_over = False
 start_time = pygame.time.get_ticks()
@@ -142,6 +144,26 @@ while True:
             if chicken_x < pedra_pos[0] + pedra.get_width() and chicken_x + chicken.get_width() > pedra_pos[0] and chicken_y < pedra_pos[1] + pedra.get_height() and chicken_y + chicken.get_height() > pedra_pos[1]:
                 game_over = True
  
+        # Gerenciar falcão
+        if hawk_active:
+            hawk_x -= hawk_speed
+            if pygame.time.get_ticks() - hawk_timer > hawk_duration:
+                hawk_active = False
+                hawk_x = WIDTH
+        else:
+            if pygame.time.get_ticks() - hawk_timer > hawk_interval:
+                hawk_active = True
+                hawk_timer = pygame.time.get_ticks()
+                hawk_y = random.randint(50, HEIGHT - 150)
+
+        # Verificar colisão com falcão
+        if hawk_active and chicken_x < hawk_x + hawk.get_width() and chicken_x + chicken.get_width() > hawk_x and chicken_y < hawk_y + hawk.get_height() and chicken_y + chicken.get_height() > hawk_y:
+            game_over = True
+
+        # Desenhar falcão
+        if hawk_active:
+            screen.blit(hawk, (hawk_x, hawk_y))
+
         # Desenhar ovos
         for egg_pos in eggs:
             screen.blit(egg, (egg_pos[0], egg_pos[1]))
@@ -149,7 +171,7 @@ while True:
         # Desenhar pedras
         for pedra_pos in pedras:
             screen.blit(pedra, pedra_pos)
- 
+
         # Desenhar galinha
         screen.blit(chicken, (chicken_x, chicken_y))
  
@@ -175,6 +197,8 @@ while True:
             chicken_velocity = 0
             eggs.clear()
             pedras.clear()
+            hawk_x = WIDTH
+            hawk_active = False
             game_over = False
             start_time = pygame.time.get_ticks()
             pedra_speed = 2
@@ -182,4 +206,4 @@ while True:
  
     # Atualizar a tela
     pygame.display.flip()
-    clock.tick(FPS)# Inicialização do Pygame
+    clock.tick(FPS)
