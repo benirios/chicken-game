@@ -39,9 +39,11 @@ pedra = pygame.image.load("pedra.png")
 pedra = pygame.transform.scale(pedra, (100, 100))
 hawk = pygame.image.load("hawk.png")
 hawk = pygame.transform.scale(hawk, (120, 80))
-magma = pygame.image.load("magma.png")
+magma = pygame.image.load("magma.gif")
 magma = pygame.transform.scale(magma, (80, 80))
- 
+arrow = pygame.image.load("arrow.png")  # Add arrow image
+arrow = pygame.transform.scale(arrow, (40, 20))  # Adjust size as needed
+
 # Variáveis do jogo
 chicken_x = WIDTH // 2 - 25
 chicken_y = HEIGHT // 2
@@ -101,7 +103,11 @@ magmas = []  # Lista para armazenar magma blocks
 magma_speed = 4  # Mais rápido que pedra_speed
 magma_spawn_rate = 3000  # Menos frequente que pedra_spawn_rate
 last_magma_spawn = pygame.time.get_ticks()
- 
+arrows = []  # Lista para armazenar flechas
+arrow_speed = 7  # Velocidade da flecha
+last_arrow_time = 0  # Controlar o tempo entre tiros
+arrow_cooldown = 500  # Tempo mínimo entre tiros (em milliseconds)
+
 # Loop principal do jogo
 while True:
     # Handle events first
@@ -266,6 +272,27 @@ while True:
             # Desenhar magma blocks
             for magma_pos in magmas:
                 screen.blit(magma, magma_pos)
+
+            # Atirar flecha quando pressionar SPACE
+            current_time = pygame.time.get_ticks()
+            keys_pressed = pygame.key.get_pressed()
+            if keys_pressed[pygame.K_SPACE] and current_time - last_arrow_time > arrow_cooldown:
+                arrows.append([chicken_x + chicken.get_width(), chicken_y + chicken.get_height()/2])
+                last_arrow_time = current_time
+
+            # Atualizar posição das flechas
+            for arrow_pos in arrows:
+                arrow_pos[0] += arrow_speed
+
+            # Remover flechas que saíram da tela
+            arrows = [a for a in arrows if a[0] < WIDTH]
+
+            # Desenhar flechas
+            for arrow_pos in arrows:
+                screen.blit(arrow, arrow_pos)
+
+            # Reset section: add this line
+            arrows.clear()  # Clear arrows when resetting
 
         else:
             # Tela de game over
