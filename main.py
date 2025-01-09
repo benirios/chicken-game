@@ -43,6 +43,10 @@ magma = pygame.image.load("magma.gif")
 magma = pygame.transform.scale(magma, (80, 80))
 arrow = pygame.image.load("arrow.png")  # Add arrow image
 arrow = pygame.transform.scale(arrow, (40, 20))  # Adjust size as needed
+play_button = pygame.image.load("play_button.png")
+play_button = pygame.transform.scale(play_button, (200, 80))  # Adjust size as needed
+quit_button = pygame.image.load("quit_button.png")
+quit_button = pygame.transform.scale(quit_button, (200, 80))  # Adjust size as needed
 
 # Variáveis do jogo
 chicken_x = WIDTH // 2 - 25
@@ -108,9 +112,15 @@ arrow_speed = 7  # Velocidade da flecha
 last_arrow_time = 0  # Controlar o tempo entre tiros
 arrow_cooldown = 500  # Tempo mínimo entre tiros (em milliseconds)
 
+# Add with other game variables
+play_button_rect = play_button.get_rect(center=(WIDTH/2, HEIGHT/2 - 50))
+quit_button_rect = quit_button.get_rect(center=(WIDTH/2, HEIGHT/2 + 50))
+
 # Loop principal do jogo
 while True:
     # Handle events first
+    keys = pygame.key.get_pressed()  # Get the state of all keyboard buttons
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
@@ -123,21 +133,21 @@ while True:
         
         if game_state == "menu":
             if event.type == pygame.MOUSEBUTTONDOWN:
-                mouse_x, mouse_y = pygame.mouse.get_pos()
-                # Check if click is within start button area
-                if (WIDTH // 2 - 100 <= mouse_x <= WIDTH // 2 + 100 and 
-                    HEIGHT // 2 <= mouse_y <= HEIGHT // 2 + 50):
+                mouse_pos = pygame.mouse.get_pos()
+                if play_button_rect.collidepoint(mouse_pos):
                     game_state = "playing"
-                    start_time = pygame.time.get_ticks()
+                elif quit_button_rect.collidepoint(mouse_pos):
+                    running = False
         
         elif game_state == "playing":
-            if (event.type == pygame.MOUSEBUTTONDOWN or 
-                keys_pressed.get(pygame.K_SPACE)) and not game_over:
+            if event.type == pygame.MOUSEBUTTONDOWN or (keys[pygame.K_SPACE] and not game_over):
                 chicken_velocity = -8
                 eggs.append([chicken_x + 15, chicken_y + 40])
 
     if game_state == "menu":
-        draw_menu()
+        screen.blit(background, (0, 0))
+        screen.blit(play_button, play_button_rect)
+        screen.blit(quit_button, quit_button_rect)
     
     elif game_state == "playing":
         # Desenhar o fundo
@@ -156,7 +166,7 @@ while True:
                 keys_pressed[event.key] = False
  
             # Soltar ovo e mover galinha para cima com mouse ou espaço
-            if (event.type == pygame.MOUSEBUTTONDOWN or keys_pressed.get(pygame.K_SPACE) and not game_over):
+            if event.type == pygame.MOUSEBUTTONDOWN or (keys[pygame.K_SPACE] and not game_over):
                 chicken_velocity = -8
                 eggs.append([chicken_x + 15, chicken_y + 40])
  
@@ -275,8 +285,7 @@ while True:
 
             # Atirar flecha quando pressionar SPACE
             current_time = pygame.time.get_ticks()
-            keys_pressed = pygame.key.get_pressed()
-            if keys_pressed[pygame.K_SPACE] and current_time - last_arrow_time > arrow_cooldown:
+            if keys[pygame.K_SPACE] and current_time - last_arrow_time > arrow_cooldown and not game_over:
                 arrows.append([chicken_x + chicken.get_width(), chicken_y + chicken.get_height()/2])
                 last_arrow_time = current_time
 
@@ -300,7 +309,7 @@ while True:
             draw_text("Click para recomeçar", 30, BLACK, WIDTH // 2 - 100, HEIGHT // 2 + 10)
  
             # Reiniciar o jogo ao clicar ou pressionar espaço
-            if event.type == pygame.MOUSEBUTTONDOWN or keys_pressed.get(pygame.K_SPACE):
+            if event.type == pygame.MOUSEBUTTONDOWN or keys[pygame.K_SPACE]:
                 game_state = "menu"
                 game_over = False
                 chicken_x = WIDTH // 2 - 25
