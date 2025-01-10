@@ -42,13 +42,15 @@ hawk = pygame.transform.scale(hawk, (120, 80))
 magma = pygame.image.load("magma.gif")
 magma = pygame.transform.scale(magma, (80, 80))
 arrow = pygame.image.load("arrow.png")  # Add arrow image
-arrow = pygame.transform.scale(arrow, (40, 20))  # Adjust size as needed
+arrow = pygame.transform.scale(arrow, (40, 20)) 
+arrow = pygame.transform.rotate(arrow, (50))  
+# print(f"Arrow image size: {arrow.get_size()}")
+if arrow is None:
+    print("Error: Arrow image not loaded!")
 play_button = pygame.image.load("play_button.png")
 play_button = pygame.transform.scale(play_button, (200, 80))  # Adjust size as needed
-quit_button = pygame.image.load("quit_button.png")
-quit_button = pygame.transform.scale(quit_button, (200, 80))  # Adjust size as needed
 
-# Variáveis do jogo
+# Variáveis do jogoquit
 chicken_x = WIDTH // 2 - 25
 chicken_y = HEIGHT // 2
 chicken_velocity = 0
@@ -108,13 +110,17 @@ magma_speed = 4  # Mais rápido que pedra_speed
 magma_spawn_rate = 3000  # Menos frequente que pedra_spawn_rate
 last_magma_spawn = pygame.time.get_ticks()
 arrows = []  # Lista para armazenar flechas
-arrow_speed = 7  # Velocidade da flecha
-last_arrow_time = 0  # Controlar o tempo entre tiros
-arrow_cooldown = 500  # Tempo mínimo entre tiros (em milliseconds)
+arrow_speed = 12  # Increased for better visibility
+last_arrow_time = pygame.time.get_ticks()
+arrow_cooldown = 100
 
 # Add with other game variables
 play_button_rect = play_button.get_rect(center=(WIDTH/2, HEIGHT/2 - 50))
-quit_button_rect = quit_button.get_rect(center=(WIDTH/2, HEIGHT/2 + 50))
+# quit_button_rect = quit_button.get_rect(center=(WIDTH/2, HEIGHT/2 + 50))
+
+# Add at the start with other variables
+ROCK_HITS_NEEDED = 3
+font = pygame.font.Font(None, 36)  # Add this for displaying hit counter
 
 # Loop principal do jogo
 while True:
@@ -136,8 +142,8 @@ while True:
                 mouse_pos = pygame.mouse.get_pos()
                 if play_button_rect.collidepoint(mouse_pos):
                     game_state = "playing"
-                elif quit_button_rect.collidepoint(mouse_pos):
-                    running = False
+                # elif quit_button_rect.collidepoint(mouse_pos):
+                #     running = False
         
         elif game_state == "playing":
             if event.type == pygame.MOUSEBUTTONDOWN or (keys[pygame.K_SPACE] and not game_over):
@@ -147,7 +153,7 @@ while True:
     if game_state == "menu":
         screen.blit(background, (0, 0))
         screen.blit(play_button, play_button_rect)
-        screen.blit(quit_button, quit_button_rect)
+        # screen.blit(quit_button, quit_button_rect)
     
     elif game_state == "playing":
         # Desenhar o fundo
@@ -283,33 +289,46 @@ while True:
             for magma_pos in magmas:
                 screen.blit(magma, magma_pos)
 
-            # Atirar flecha quando pressionar SPACE
+            # Atirar flecha quando pressionar Q
             current_time = pygame.time.get_ticks()
-            if keys[pygame.K_SPACE] and current_time - last_arrow_time > arrow_cooldown and not game_over:
-                arrows.append([chicken_x + chicken.get_width(), chicken_y + chicken.get_height()/2])
+            if keys[pygame.K_q] and current_time - last_arrow_time > arrow_cooldown and not game_over:
+                arrow_dict = {
+                    'x': chicken_x + (chicken.get_width() - arrow.get_width()) // 2,
+                    'y': chicken_y,
+                    'rect': pygame.Rect(chicken_x, chicken_y, arrow.get_width(), arrow.get_height())
+                }
+                arrows.append(arrow_dict)
                 last_arrow_time = current_time
 
-            # Atualizar posição das flechas
-            for arrow_pos in arrows:
-                arrow_pos[0] += arrow_speed
+            # Update and draw arrows - Make sure this is BEFORE any screen.fill() or background drawing
+            arrows_to_remove = []
+            for arrow_dict in arrows:
+                arrow_dict['y'] -= arrow_speed
+                arrow_dict['rect'].x = arrow_dict['x']
+                arrow_dict['rect'].y = arrow_dict['y']
+                
+                # Check collision with rocks
+                for pedra_pos in pedras[:]:  # Use copy of list for safe iteration
+                    pedra_rect = pygame.Rect(pedra_pos[0], pedra_pos[1], pedra.get_width(), pedra.get_height())
+                    if arrow_dict['rect'].colliderect(pedra_rect):
+                        # Remove both the arrow and the rock
+                        if arrow_dict not in arrows_to_remove:
+                            arrows_to_remove.append(arrow_dict)
+                        if pedra_pos in pedras:
+                            pedras.remove(pedra_pos)
+                        break
+                
+                if arrow_dict['y'] < -arrow.get_height():
+                    arrows_to_remove.append(arrow_dict)
+                else:
+                    screen.blit(arrow, (arrow_dict['x'], arrow_dict['y']))
 
-            # Remover flechas que saíram da tela
-            arrows = [a for a in arrows if a[0] < WIDTH]
-
-            # Desenhar flechas
-            for arrow_pos in arrows:
-                screen.blit(arrow, arrow_pos)
-
-            # Reset section: add this line
-            arrows.clear()  # Clear arrows when resetting
+            # Remove used arrows
+            for arrow_dict in arrows_to_remove:
+                if arrow_dict in arrows:
+                    arrows.remove(arrow_dict)
 
         else:
-            # Tela de game over
-            draw_text("Game Over", 50, RED, WIDTH // 2 - 100, HEIGHT // 2 - 50)
-            draw_text("Click para recomeçar", 30, BLACK, WIDTH // 2 - 100, HEIGHT // 2 + 10)
- 
-            # Reiniciar o jogo ao clicar ou pressionar espaço
-            if event.type == pygame.MOUSEBUTTONDOWN or keys[pygame.K_SPACE]:
                 game_state = "menu"
                 game_over = False
                 chicken_x = WIDTH // 2 - 25
