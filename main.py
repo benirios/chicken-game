@@ -2,11 +2,13 @@
 import sys
 import random
 from screeninfo import get_monitors
+import pygame.mixer
 
 for monitor in get_monitors():
     print(f"Monitor: {monitor.name}, Width: {monitor.width}, Height: {monitor.height}, Position: ({monitor.x}, {monitor.y})")
 
 # Inicialização do Pygame
+pygame.mixer.init()
 pygame.init()
  
 # Configurações da tela
@@ -49,6 +51,14 @@ if arrow is None:
     print("Error: Arrow image not loaded!")
 play_button = pygame.image.load("play_button.png")
 play_button = pygame.transform.scale(play_button, (200, 80))  # Adjust size as needed
+
+# Add background music
+try:
+    pygame.mixer.music.load("background_music.mp3")
+    pygame.mixer.music.set_volume(1)  # Adjust this value between 0.0 and 1.0
+    pygame.mixer.music.play(-1)
+except pygame.error:
+    print("Could not load or play background music")
 
 # Variáveis do jogoquit
 chicken_x = WIDTH // 2 - 25
@@ -118,9 +128,8 @@ arrow_cooldown = 100
 play_button_rect = play_button.get_rect(center=(WIDTH/2, HEIGHT/2 - 50))
 # quit_button_rect = quit_button.get_rect(center=(WIDTH/2, HEIGHT/2 + 50))
 
-# Add at the start with other variables
-ROCK_HITS_NEEDED = 3
-font = pygame.font.Font(None, 36)  # Add this for displaying hit counter
+# Add near the other game variables
+rock_hit_score = 0  # New variable to track rocks hit
 
 # Loop principal do jogo
 while True:
@@ -134,6 +143,17 @@ while True:
         
         if event.type == pygame.KEYDOWN:
             keys_pressed[event.key] = True
+            if event.key == pygame.K_UP:  # Volume up
+                current_volume = pygame.mixer.music.get_volume()
+                pygame.mixer.music.set_volume(min(1.0, current_volume + 0.1))
+            elif event.key == pygame.K_DOWN:  # Volume down
+                current_volume = pygame.mixer.music.get_volume()
+                pygame.mixer.music.set_volume(max(0.0, current_volume - 0.1))
+            elif event.key == pygame.K_m:  # Mute/unmute
+                if pygame.mixer.music.get_volume() > 0:
+                    pygame.mixer.music.set_volume(0.0)
+                else:
+                    pygame.mixer.music.set_volume(0.5)
         if event.type == pygame.KEYUP:
             keys_pressed[event.key] = False
         
@@ -263,6 +283,7 @@ while True:
             # Calcular pontuação
             elapsed_time = (pygame.time.get_ticks() - start_time) // 1000
             draw_text(f"Score: {elapsed_time}", 30, BLACK, 10, 10)
+            draw_text(f"Rocks Hit: {rock_hit_score}", 30, BLACK, 10, 40)  # Add rock hit score display
  
             # Gerar magma blocks aleatoriamente
             elapsed_time = pygame.time.get_ticks()
@@ -300,7 +321,7 @@ while True:
                 arrows.append(arrow_dict)
                 last_arrow_time = current_time
 
-            # Update and draw arrows - Make sure this is BEFORE any screen.fill() or background drawing
+            # Update and draw arrows
             arrows_to_remove = []
             for arrow_dict in arrows:
                 arrow_dict['y'] -= arrow_speed
@@ -308,16 +329,29 @@ while True:
                 arrow_dict['rect'].y = arrow_dict['y']
                 
                 # Check collision with rocks
-                for pedra_pos in pedras[:]:  # Use copy of list for safe iteration
+                for pedra_pos in pedras[:]:
                     pedra_rect = pygame.Rect(pedra_pos[0], pedra_pos[1], pedra.get_width(), pedra.get_height())
                     if arrow_dict['rect'].colliderect(pedra_rect):
-                        # Remove both the arrow and the rock
+                        # Remove both the arrow and the rock and increase score
                         if arrow_dict not in arrows_to_remove:
                             arrows_to_remove.append(arrow_dict)
                         if pedra_pos in pedras:
                             pedras.remove(pedra_pos)
+                            rock_hit_score += 3  # Increase score by 3 when rock is hit
                         break
                 
+                # Check collision with magma
+                for magma_pos in magmas[:]:
+                    magma_rect = pygame.Rect(magma_pos[0], magma_pos[1], magma.get_width(), magma.get_height())
+                    if arrow_dict['rect'].colliderect(magma_rect):
+                        # Remove the arrow and decrease score
+                        if arrow_dict not in arrows_to_remove:
+                            arrows_to_remove.append(arrow_dict)
+                        if magma_pos in magmas:
+                            magmas.remove(magma_pos)
+                            rock_hit_score = max(0, rock_hit_score - 4)  # Decrease score by 4, but don't go below 0
+                        break
+
                 if arrow_dict['y'] < -arrow.get_height():
                     arrows_to_remove.append(arrow_dict)
                 else:
@@ -329,18 +363,20 @@ while True:
                     arrows.remove(arrow_dict)
 
         else:
-                game_state = "menu"
-                game_over = False
-                chicken_x = WIDTH // 2 - 25
-                chicken_y = HEIGHT // 2
-                chicken_velocity = 0
-                eggs.clear()
-                pedras.clear()
-                magmas.clear()  # Clear magma blocks
-                hawk_x = WIDTH
-                hawk_active = False
-                pedra_speed = 2
-                pedra_spawn_rate = 1000
+            game_state = "menu"
+            game_over = False
+            chicken_x = WIDTH // 2 - 25
+            chicken_y = HEIGHT // 2
+            chicken_velocity = 0
+            eggs.clear()
+            pedras.clear()
+            magmas.clear()
+            hawk_x = WIDTH
+            hawk_active = False
+            pedra_speed = 2
+            pedra_spawn_rate = 1000
+            rock_hit_score = 0  # Reset rock hit score
+            start_time = pygame.time.get_ticks()  # Reset the timer/score
 
     pygame.display.flip()
     clock.tick(FPS)
