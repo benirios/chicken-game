@@ -10,13 +10,14 @@ for monitor in get_monitors():
 # Inicialização do Pygame
 pygame.mixer.init()
 pygame.init()
- 
+
+# Carregar som da flecha
+arrow_sound = pygame.mixer.Sound("arrow_sound.mp3")
+
 # Configurações da tela
 WIDTH, HEIGHT = monitor.width, monitor.height
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Chicken Egg Drop")
-
-
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
 
@@ -25,11 +26,11 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 BLUE = (0, 0, 255)
- 
+
 # Relógio para controlar o FPS
 clock = pygame.time.Clock()
-FPS = 75
- 
+FPS = 60
+
 # Carregar imagens
 chicken = pygame.image.load("galinha.png")
 chicken = pygame.transform.scale(chicken, (70, 70))
@@ -40,17 +41,33 @@ background = pygame.transform.scale(background, (WIDTH, HEIGHT))
 pedra = pygame.image.load("pedra.png")
 pedra = pygame.transform.scale(pedra, (100, 100))
 hawk = pygame.image.load("hawk.png")
-hawk = pygame.transform.scale(hawk, (120, 80))
+hawk = pygame.transform.scale(hawk, (80, 80))
 magma = pygame.image.load("magma.gif")
-magma = pygame.transform.scale(magma, (80, 80))
+magma = pygame.transform.scale(magma, (100, 100))
 arrow = pygame.image.load("arrow.png")  # Add arrow image
 arrow = pygame.transform.scale(arrow, (40, 20)) 
 arrow = pygame.transform.rotate(arrow, (50))  
-# print(f"Arrow image size: {arrow.get_size()}")
 if arrow is None:
     print("Error: Arrow image not loaded!")
 play_button = pygame.image.load("play_button.png")
-play_button = pygame.transform.scale(play_button, (200, 80))  # Adjust size as needed
+play_button = pygame.transform.scale(play_button, (300, 30))  # Adjust size as needed
+quit_button = pygame.image.load("quit_button.png")
+quit_button = pygame.transform.scale(quit_button, (150, 31))  # Adjust size as needed
+# Carregar imagem de fundo da tela inicial
+menu_background = pygame.image.load("a.png")
+menu_background = pygame.transform.scale(menu_background, (WIDTH, HEIGHT))
+# Carregar imagem de carregamento
+loading_image = pygame.image.load("carregamento.gif")
+loading_image = pygame.transform.scale(loading_image, (WIDTH, HEIGHT))
+
+
+
+# Carregar imagem de leitura
+Reading_world = pygame.image.load("Reading_world.png")
+Reading_world = pygame.transform.scale(Reading_world, (WIDTH, HEIGHT))
+
+# Centralizar a imagem de leitura na tela
+reading_world_rect = Reading_world.get_rect(center=(WIDTH // 2, HEIGHT // 2))
 
 # Add background music
 try:
@@ -60,20 +77,20 @@ try:
 except pygame.error:
     print("Could not load or play background music")
 
-# Variáveis do jogoquit
+# Variáveis do jogo
 chicken_x = WIDTH // 2 - 25
 chicken_y = HEIGHT // 2
 chicken_velocity = 0
 chicken_speed = 5  # Aumenta a velocidade lateral
 chicken_flipped = False  # Variável para controlar se a galinha está invertida
- 
+
 eggs = []
 egg_speed = 5
- 
+
 pedras = []
 pedra_speed = 2
 pedra_spawn_rate = 1000  # Tempo inicial entre o aparecimento das pedras (em milissegundos)
- 
+
 hawk_active = False
 hawk_x = WIDTH
 hawk_y = random.randint(50, HEIGHT - 150)
@@ -81,17 +98,20 @@ hawk_speed = 7
 hawk_timer = pygame.time.get_ticks()
 hawk_interval = 30000  # 30 segundos em milissegundos
 hawk_duration = 10000  # 10 segundos em milissegundos
- 
+
 game_over = False
 start_time = pygame.time.get_ticks()
 last_pedra_spawn = pygame.time.get_ticks()
- 
+
 # Variáveis para controle de movimento contínuo
 keys_pressed = {}
- 
+
 # Variável para controlar o estado do jogo
-game_state = "menu"  # Can be "menu" or "playing"
- 
+game_state = "menu"  # Can be "menu", "reading", or "playing"
+
+# Variável para controlar o tempo de exibição da imagem de leitura
+reading_start_time = None
+
 # Função para exibir texto
 def draw_text(text, size, color, x, y):
     font = pygame.font.Font(None, size)
@@ -100,20 +120,11 @@ def draw_text(text, size, color, x, y):
     
 # Função para exibir o menu
 def draw_menu():
-    # Draw background
-    screen.blit(background, (0, 0))
-    
-    # Draw title
-    draw_text("Chicken Egg Drop", 64, BLACK, WIDTH // 2 - 200, HEIGHT // 3)
-    
-    # Draw start button
-    pygame.draw.rect(screen, BLUE, (WIDTH // 2 - 100, HEIGHT // 2, 200, 50))
-    draw_text("Start Game", 36, WHITE, WIDTH // 2 - 70, HEIGHT // 2 + 10)
-    
-    # Draw instructions
-    draw_text("Use arrows or A/D to move", 30, BLACK, WIDTH // 2 - 150, HEIGHT * 2 // 3)
-    draw_text("Click or Space to jump and drop eggs", 30, BLACK, WIDTH // 2 - 200, HEIGHT * 2 // 3 + 40)
- 
+    # Draw menu background
+    screen.blit(menu_background, (0, 0))
+    screen.blit(play_button, play_button_rect)
+    screen.blit(quit_button, quit_button_rect)
+
 # Variáveis do jogo
 magmas = []  # Lista para armazenar magma blocks
 magma_speed = 4  # Mais rápido que pedra_speed
@@ -126,7 +137,7 @@ arrow_cooldown = 100
 
 # Add with other game variables
 play_button_rect = play_button.get_rect(center=(WIDTH/2, HEIGHT/2 - 50))
-# quit_button_rect = quit_button.get_rect(center=(WIDTH/2, HEIGHT/2 + 50))
+quit_button_rect = quit_button.get_rect(center=(WIDTH/2, HEIGHT/2 + 0))
 
 # Add near the other game variables
 rock_hit_score = 0  # New variable to track rocks hit
@@ -161,9 +172,11 @@ while True:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
                 if play_button_rect.collidepoint(mouse_pos):
-                    game_state = "playing"
-                # elif quit_button_rect.collidepoint(mouse_pos):
-                #     running = False
+                    game_state = "reading"
+                    reading_start_time = pygame.time.get_ticks()
+                elif quit_button_rect.collidepoint(mouse_pos):
+                    pygame.quit()
+                    sys.exit()
         
         elif game_state == "playing":
             if event.type == pygame.MOUSEBUTTONDOWN or (keys[pygame.K_SPACE] and not game_over):
@@ -171,9 +184,13 @@ while True:
                 eggs.append([chicken_x + 15, chicken_y + 40])
 
     if game_state == "menu":
-        screen.blit(background, (0, 0))
-        screen.blit(play_button, play_button_rect)
-        # screen.blit(quit_button, quit_button_rect)
+        draw_menu()
+    
+    elif game_state == "reading":
+        screen.blit(Reading_world, (0, 0))
+        if pygame.time.get_ticks() - reading_start_time > 10000:  # 10 segundos
+            game_state = "playing"
+            start_time = pygame.time.get_ticks()  # Reset the timer/score
     
     elif game_state == "playing":
         # Desenhar o fundo
@@ -320,6 +337,7 @@ while True:
                 }
                 arrows.append(arrow_dict)
                 last_arrow_time = current_time
+                arrow_sound.play()  # Play arrow sound
 
             # Update and draw arrows
             arrows_to_remove = []
