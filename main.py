@@ -3,6 +3,7 @@ import sys
 import random
 from screeninfo import get_monitors
 import pygame.mixer
+import os
 
 for monitor in get_monitors():
     print(f"Monitor: {monitor.name}, Width: {monitor.width}, Height: {monitor.height}, Position: ({monitor.x}, {monitor.y})")
@@ -56,9 +57,7 @@ quit_button = pygame.transform.scale(quit_button, (150, 31))  # Adjust size as n
 # Carregar imagem de fundo da tela inicial
 menu_background = pygame.image.load("a.png")
 menu_background = pygame.transform.scale(menu_background, (WIDTH, HEIGHT))
-# Carregar imagem de carregamento
-loading_image = pygame.image.load("carregamento.gif")
-loading_image = pygame.transform.scale(loading_image, (WIDTH, HEIGHT))
+
 
 
 
@@ -81,6 +80,8 @@ except pygame.error:
 chicken_x = WIDTH // 2 - 25
 chicken_y = HEIGHT // 2
 chicken_velocity = 0
+JUMP_VELOCITY = -6  # Reduced from -8 for slower upward movement
+GRAVITY = 0.3      # Reduced from 0.5 for slower falling
 chicken_speed = 5  # Aumenta a velocidade lateral
 chicken_flipped = False  # Variável para controlar se a galinha está invertida
 
@@ -142,6 +143,45 @@ quit_button_rect = quit_button.get_rect(center=(WIDTH/2, HEIGHT/2 + 0))
 # Add near the other game variables
 rock_hit_score = 0  # New variable to track rocks hit
 
+# Load all frames from carregamento folder
+loading_frames = []
+carregamento_folder = "carregamento"  # Make sure this folder exists
+try:
+    if not os.path.exists(carregamento_folder):
+        os.makedirs(carregamento_folder)
+        print(f"Created {carregamento_folder} folder. Please add animation frames to it.")
+    
+    frame_files = sorted([f for f in os.listdir(carregamento_folder) if f.endswith(('.png', '.gif'))])
+    if not frame_files:
+        print("No animation frames found in carregamento folder.")
+    
+    for frame_file in frame_files:
+        frame_path = os.path.join(carregamento_folder, frame_file)
+        try:
+            frame = pygame.image.load(frame_path)
+            frame = pygame.transform.scale(frame, (256, 280))
+            loading_frames.append(frame)
+        except pygame.error as e:
+            print(f"Error loading frame {frame_file}: {e}")
+
+except Exception as e:
+    print(f"Error with animation frames: {e}")
+
+if not loading_frames:
+    # Create a default loading frame if no frames are loaded
+    default_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    default_surface.fill((0, 0, 0, 128))  # Semi-transparent black
+    font = pygame.font.Font(None, 36)
+    text = font.render("Loading...", True, (255, 255, 255))
+    text_rect = text.get_rect(center=(WIDTH/2, HEIGHT/2))
+    default_surface.blit(text, text_rect)
+    loading_frames = [default_surface]
+
+# Add variables for animation control
+current_frame = 0
+frame_delay = 100  # Milliseconds between frames
+last_frame_time = pygame.time.get_ticks()
+
 # Loop principal do jogo
 while True:
     # Handle events first
@@ -177,17 +217,29 @@ while True:
                 elif quit_button_rect.collidepoint(mouse_pos):
                     pygame.quit()
                     sys.exit()
-        
-        elif game_state == "playing":
-            if event.type == pygame.MOUSEBUTTONDOWN or (keys[pygame.K_SPACE] and not game_over):
-                chicken_velocity = -8
-                eggs.append([chicken_x + 15, chicken_y + 40])
 
+    # Update screen based on game state
     if game_state == "menu":
         draw_menu()
     
     elif game_state == "reading":
+        # Draw the Reading World background first
         screen.blit(Reading_world, (0, 0))
+        
+        # Draw loading animation frame on top if we have frames
+        if loading_frames:
+            current_time = pygame.time.get_ticks()
+            if current_time - last_frame_time > frame_delay:
+                current_frame = (current_frame + 1) % len(loading_frames)
+                last_frame_time = current_time
+            
+            # Calculate center position for the loading animation
+            loading_frame = loading_frames[current_frame]
+            loading_rect = loading_frame.get_rect()
+            loading_rect.center = (WIDTH // 2, HEIGHT // 2)
+            
+            screen.blit(loading_frames[current_frame], loading_rect)
+        
         if pygame.time.get_ticks() - reading_start_time > 10000:  # 10 segundos
             game_state = "playing"
             start_time = pygame.time.get_ticks()  # Reset the timer/score
@@ -195,29 +247,17 @@ while True:
     elif game_state == "playing":
         # Desenhar o fundo
         screen.blit(background, (0, 0))
- 
-        # Verificar eventos
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
- 
-            # Capturar eventos de teclado
-            if event.type == pygame.KEYDOWN:
-                keys_pressed[event.key] = True
-            if event.type == pygame.KEYUP:
-                keys_pressed[event.key] = False
- 
-            # Soltar ovo e mover galinha para cima com mouse ou espaço
-            if event.type == pygame.MOUSEBUTTONDOWN or (keys[pygame.K_SPACE] and not game_over):
-                chicken_velocity = -8
-                eggs.append([chicken_x + 15, chicken_y + 40])
- 
+
         if not game_over:
+            # Soltar ovo e mover galinha para cima com mouse ou espaço
+            if keys[pygame.K_SPACE] or pygame.mouse.get_pressed()[0]:  # Check for space key or left mouse button
+                chicken_velocity = JUMP_VELOCITY
+                eggs.append([chicken_x + 15, chicken_y + 40])
+
             # Atualizar posição da galinha
-            chicken_velocity += 0.5  # Gravidade
+            chicken_velocity += GRAVITY  # Slower gravity
             chicken_y += chicken_velocity
- 
+
             # Movimento contínuo para os lados
             if keys_pressed.get(pygame.K_LEFT) or keys_pressed.get(pygame.K_a):
                 chicken_x -= chicken_speed
@@ -229,7 +269,7 @@ while True:
                 if chicken_flipped:
                     chicken = pygame.transform.flip(chicken, True, False)  # Inverter horizontalmente
                     chicken_flipped = False
- 
+
             # Limitar movimento da galinha para cima e baixo
             if chicken_y < 0:
                 chicken_y = 0
@@ -237,29 +277,29 @@ while True:
             # Verifica se a galinha chegou ao fim da tela embaixo
             if chicken_y > HEIGHT - chicken.get_height():
                 game_over = True
- 
+
             # Atualizar ovos
             for egg_pos in eggs:
                 egg_pos[1] += egg_speed
- 
+
             # Gerar pedras aleatoriamente
             elapsed_time = pygame.time.get_ticks()
             if elapsed_time - last_pedra_spawn > pedra_spawn_rate:
                 pedras.append([random.randint(0, WIDTH - pedra.get_width()), 0])
                 last_pedra_spawn = elapsed_time
- 
+
             # Atualizar posição das pedras
             for pedra_pos in pedras:
                 pedra_pos[1] += pedra_speed
- 
+
             # Remover pedras que saíram da tela
             pedras = [pedra for pedra in pedras if pedra[1] < HEIGHT]
- 
+
             # Verificar colisão com pedras
             for pedra_pos in pedras:
                 if chicken_x < pedra_pos[0] + pedra.get_width() and chicken_x + chicken.get_width() > pedra_pos[0] and chicken_y < pedra_pos[1] + pedra.get_height() and chicken_y + chicken.get_height() > pedra_pos[1]:
                     game_over = True
- 
+
             # Gerenciar falcão
             if hawk_active:
                 hawk_x -= hawk_speed
@@ -283,25 +323,25 @@ while True:
             # Desenhar ovos
             for egg_pos in eggs:
                 screen.blit(egg, (egg_pos[0], egg_pos[1]))
- 
+
             # Desenhar pedras
             for pedra_pos in pedras:
                 screen.blit(pedra, pedra_pos)
 
             # Desenhar galinha
             screen.blit(chicken, (chicken_x, chicken_y))
- 
+
             # Limitar movimento da galinha para os lados
             if chicken_x < 0:
                 chicken_x = 0
             if chicken_x > WIDTH - chicken.get_width():
                 chicken_x = WIDTH - chicken.get_width()
- 
+
             # Calcular pontuação
             elapsed_time = (pygame.time.get_ticks() - start_time) // 1000
             draw_text(f"Score: {elapsed_time}", 30, BLACK, 10, 10)
             draw_text(f"Rocks Hit: {rock_hit_score}", 30, BLACK, 10, 40)  # Add rock hit score display
- 
+
             # Gerar magma blocks aleatoriamente
             elapsed_time = pygame.time.get_ticks()
             if elapsed_time - last_magma_spawn > magma_spawn_rate:
